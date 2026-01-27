@@ -1,0 +1,127 @@
+animation:
+  check_interval: 0.1
+  frame_diff_threshold: 0.02
+  max_wait_time: 5.0
+  stability_check_frames: 3
+board:
+  cols: 8
+  rows: 8
+button_positions:
+  batdau:
+    x: 1258
+    y: 557
+  chien:
+    x: 1341
+    y: 808
+  nhan:
+    x: 723
+    y: 706
+button_regions:
+  nhan:
+    height: 53
+    left: 631
+    top: 673
+    width: 176
+calculation:
+  beam_width_ratio: 0.3
+  cascade_max_depth: 3
+  max_calculation_time: 0.5
+  use_beam_search: true
+  use_cascade_simulation: true
+cell:
+  height: 100
+  width: 100
+debug:
+  save_screenshots: false
+  show_board: false
+  show_matches: false
+  verbose: true
+game_automation:
+  after_click_delay: 1.5
+  button_keywords:
+    batdau:
+    - Bắt đầu
+    - Bat dau
+    - BẮT ĐẦU
+    - Bắt Đầu
+    chien:
+    - Chiến
+    - Chien
+    - CHIẾN
+    nhan:
+    - Nhận
+    - Nhan
+    - NHẬN
+  enabled: true
+  map_timeout: 15
+  ocr_confidence: 60
+  playing_timeout: 300
+  ready_timeout: 10
+  reward_timeout: 10
+  state_check_interval: 0.5
+  tesseract_path: C:\Program Files\Tesseract-OCR\tesseract.exe
+game_window:
+  height: 840
+  left: 1
+  top: 1
+  width: 1439
+gems:
+- BLUE_LIGHTNING
+- GREEN_HEART
+- ORANGE_SUN
+- PURPLE_MOON
+- RED_FIRE
+- YELLOW_STAR
+- RED_HEART
+- GRAY_YINYANG
+matching:
+  method: cv2.TM_CCORR_NORMED
+  threshold: 0.6
+mouse:
+  drag_duration: 0.3
+  random_delay_max: 0.3
+  random_delay_min: 0.1
+scoring:
+  cascade_chain_bonus: 80
+  cascade_gem_bonus: 25
+  cascade_match_bonus: 60
+  combo_bonus: 30
+  combo_multiplier: 1.5
+  gem_priority:
+    BLUE_LIGHTNING: 80
+    GRAY_YINYANG: 20
+    GREEN_HEART: 60
+    ORANGE_SUN: 30
+    PURPLE_MOON: 30
+    RED_FIRE: 70
+    RED_HEART: 20
+    YELLOW_STAR: 100
+  gem_removed: 10
+  match_4: 100
+  match_5: 300
+  move_delay_max: 3.0
+  move_delay_min: 2.0
+  scarcity_multiplier: 50
+  special_gem: 50
+  unlock_tile: 20
+screen:
+  height: 577
+  left: 430
+  top: 64
+  width: 586
+turn_detection:
+  detection_method: ocr
+  enabled: true
+  max_wait_time: 30
+  min_timer_value: 2
+  tesseract_cmd: C:\Program Files\Tesseract-OCR\tesseract.exe
+  timer_region:
+    height: 116
+    left: 309
+    top: 160
+    width: 108
+  your_turn_region:
+    height: 100
+    left: 490
+    top: 140
+    width: 340
