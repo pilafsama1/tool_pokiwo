@@ -18,7 +18,7 @@ button_positions:
     y: 706
   the_bai:
     x: 735
-    y: 716
+    y: 774
 button_regions:
   nhan:
     height: 53

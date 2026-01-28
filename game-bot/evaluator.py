@@ -38,7 +38,7 @@ class MoveEvaluator:
             Điểm số của gem đó
         """
         gem_points = {
-            "YELLOW_STAR": 50,  # Gem vàng: 50 điểm (ưu tiên cao)
+            "YELLOW_STAR": 70,  # Gem vàng: 70 điểm (ưu tiên rất cao)
             "GREEN": 15,         # Gem xanh lá: 15 điểm
             "RED": 14,           # Gem đỏ: 14 điểm
             "BLUE": 13,          # Gem xanh dương: 13 điểm
