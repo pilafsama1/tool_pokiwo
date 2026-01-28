@@ -152,6 +152,18 @@ class BotGUI:
         )
         self.batdau_btn.pack(pady=3)
         
+        self.the_bai_btn = tk.Button(
+            button_pos_frame,
+            text="🃏 Nút THẻ BÀI (click)",
+            command=lambda: self.select_button_position('the_bai'),
+            font=('Arial', 9),
+            bg='#9b59b6',
+            fg='white',
+            width=22,
+            cursor='hand2'
+        )
+        self.the_bai_btn.pack(pady=3)
+        
         # Column 3: Vùng nút Nhận (để detect)
         nhan_region_frame = tk.Frame(calib_frame)
         nhan_region_frame.grid(row=0, column=2, padx=10, sticky='n')
@@ -395,12 +407,13 @@ class BotGUI:
         """Select a specific button position
         
         Args:
-            button_type: 'nhan', 'chien', or 'batdau'
+            button_type: 'nhan', 'chien', 'batdau', or 'the_bai'
         """
         button_names = {
             'nhan': 'NHẬN',
             'chien': 'CHIẾN',
-            'batdau': 'BẮT ĐẦU'
+            'batdau': 'BẮT ĐẦU',
+            'the_bai': 'THẺ BÀI'
         }
         
         print(f"\n{'='*60}")

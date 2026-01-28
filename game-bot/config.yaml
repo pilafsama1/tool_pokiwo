@@ -16,6 +16,9 @@ button_positions:
   nhan:
     x: 723
     y: 706
+  the_bai:
+    x: 735
+    y: 716
 button_regions:
   nhan:
     height: 53
@@ -24,8 +27,8 @@ button_regions:
     width: 176
 calculation:
   beam_width_ratio: 0.3
-  cascade_max_depth: 3
-  max_calculation_time: 0.5
+  cascade_max_depth: 15
+  max_calculation_time: 3.0
   use_beam_search: true
   use_cascade_simulation: true
 cell:

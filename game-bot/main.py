@@ -576,9 +576,24 @@ class GameBot:
                 if self.config['debug']['verbose']:
                     print(f"✓ Timer: {timer_value}s → Đến lượt chơi!")
                 
-                # Đợi 2 giây sau khi phát hiện timer
-                print("⏳ Đợi 2 giây sau khi phát hiện timer...")
-                time.sleep(2.0)
+                # Click nút thẻ bài (nếu đã config)
+                button_pos_config = self.config.get('button_positions', {})
+                if button_pos_config.get('the_bai'):
+                    the_bai_pos = button_pos_config['the_bai']
+                    if self.config['debug']['verbose']:
+                        print(f"🃏 Click nút Thẻ Bài tại ({the_bai_pos['x']}, {the_bai_pos['y']})")
+                    
+                    if self.state_manager:
+                        self.state_manager.click_at_position(the_bai_pos['x'], the_bai_pos['y'])
+                    else:
+                        # Fallback: dùng pyautogui trực tiếp
+                        import pyautogui
+                        pyautogui.click(the_bai_pos['x'], the_bai_pos['y'])
+                    
+                    time.sleep(0.2)  # Delay nhỏ sau khi click
+                else:
+                    if self.config['debug']['verbose']:
+                        print("⚠️ Chưa config vị trí nút Thẻ Bài - Bỏ qua")
             
             # ============================================================
             # BƯỚC 2: ĐỢI BOARD ỔN ĐỊNH

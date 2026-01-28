@@ -27,6 +27,75 @@ class MoveEvaluator:
         self.rules = scoring_rules
         self.gem_priority = scoring_rules.get('gem_priority', {})
     
+    def get_gem_points(self, gem_type: str) -> int:
+        """
+        Lấy điểm số của từng loại gem
+        
+        Args:
+            gem_type: Loại gem (YELLOW_STAR, GREEN, RED, BLUE, etc.)
+            
+        Returns:
+            Điểm số của gem đó
+        """
+        gem_points = {
+            "YELLOW_STAR": 50,  # Gem vàng: 50 điểm (ưu tiên cao)
+            "GREEN": 15,         # Gem xanh lá: 15 điểm
+            "RED": 14,           # Gem đỏ: 14 điểm
+            "BLUE": 13,          # Gem xanh dương: 13 điểm
+        }
+        return gem_points.get(gem_type, 10)  # Các gem khác: 10 điểm
+    
+    def _simulate_cascade_multiple_runs(self, move: Move, board: List[List[str]], 
+                                       logic: MatchThreeLogic, num_simulations: int = 5,
+                                       max_depth: int = 15) -> int:
+        """
+        Mô phỏng cascade nhiều lần với random spawn để tính điểm chính xác
+        
+        Args:
+            move: Move to evaluate
+            board: Current board state
+            logic: MatchThreeLogic instance
+            num_simulations: Số lần chạy simulation (càng nhiều càng chính xác)
+            max_depth: Số cấp cascade tối đa
+            
+        Returns:
+            Điểm cascade trung bình từ tất cả các lần chạy
+        """
+        total_score = 0
+        
+        for sim_run in range(num_simulations):
+            # Tạo bản sao board cho mỗi lần chạy
+            board_copy = [row[:] for row in board]
+            logic.swap_gems(board_copy, move.from_pos, move.to_pos)
+            
+            # Mô phỏng cascade với random spawn
+            cascade_result = logic.simulate_cascade(
+                board_copy, 
+                move.matches, 
+                max_iterations=max_depth,
+                spawn_gems=True  # Bật random spawn
+            )
+            
+            # Tính điểm từ cascade (bỏ chain đầu tiên)
+            cascade_chains = cascade_result.get('cascade_chains', [])
+            run_score = 0
+            
+            for chain_index in range(1, len(cascade_chains)):
+                matches_in_chain = cascade_chains[chain_index]
+                
+                for match in matches_in_chain:
+                    gem_type = match.gem_type
+                    gem_count = len(match.positions)
+                    
+                    # Tính điểm theo loại gem
+                    gem_point = self.get_gem_points(gem_type)
+                    run_score += gem_count * gem_point
+            
+            total_score += run_score
+        
+        # Trả về điểm trung bình
+        return total_score // num_simulations if num_simulations > 0 else 0
+    
     def score_move(self, move: Move, board: List[List[str]], 
                    logic: MatchThreeLogic, use_cascade_simulation: bool = True) -> int:
         """
@@ -53,11 +122,8 @@ class MoveEvaluator:
             for pos in match.positions:
                 gem_type = board[pos.row][pos.col]
                 
-                # Viên vàng = 25 điểm, các viên khác = 10 điểm
-                if gem_type == "YELLOW_STAR":
-                    score += 25
-                else:
-                    score += 10
+                # Tính điểm theo loại gem: YELLOW_STAR=35, GREEN=15, RED=14, BLUE=13, khác=10
+                score += self.get_gem_points(gem_type)
         
         # ================================================================
         # BƯỚC 2: Mô phỏng cascade để tính điểm combo
@@ -205,8 +271,9 @@ class MoveEvaluator:
                                          logic: MatchThreeLogic) -> int:
         """
         Mô phỏng cascade và tính điểm từ tất cả gems ăn được trong chuỗi phản ứng
-        - Viên vàng (YELLOW_STAR): 25 điểm
-        - Các viên khác: 10 điểm
+        DEPRECATED: Dùng _simulate_cascade_multiple_runs để chính xác hơn
+        
+        Hàm này giữ lại để tương thích với code cũ (score_move với use_cascade_simulation)
         
         Args:
             move: Move to evaluate
@@ -216,36 +283,8 @@ class MoveEvaluator:
         Returns:
             Total points from cascade gems (không tính gems ban đầu)
         """
-        # Tạo bản sao board để mô phỏng
-        board_copy = [row[:] for row in board]
-        logic.swap_gems(board_copy, move.from_pos, move.to_pos)
-        
-        # Mô phỏng cascade (tối đa 10 vòng để bao phủ hết cascade dài)
-        cascade_result = logic.simulate_cascade(board_copy, move.matches, max_iterations=10)
-        
-        # Lấy tất cả cascade chains (bỏ qua chain đầu tiên vì đã tính ở bước 1)
-        cascade_chains = cascade_result.get('cascade_chains', [])
-        
-        # Nếu cascade_depth <= 1, không có cascade bổ sung
-        if cascade_result.get('cascade_depth', 0) <= 1:
-            return 0
-        
-        cascade_score = 0
-        
-        # Tính điểm cho gems từ cascade (bắt đầu từ chain thứ 2)
-        for chain_index in range(1, len(cascade_chains)):
-            matches_in_chain = cascade_chains[chain_index]
-            
-            for match in matches_in_chain:
-                gem_type = match.gem_type
-                gem_count = len(match.positions)
-                
-                if gem_type == "YELLOW_STAR":
-                    cascade_score += gem_count * 25
-                else:
-                    cascade_score += gem_count * 10
-        
-        return cascade_score
+        # Dùng hàm mới với 1 lần simulation (nhanh hơn)
+        return self._simulate_cascade_multiple_runs(move, board, logic, num_simulations=1, max_depth=10)
     
     def _calculate_dynamic_priority_bonus(self, move: Move, board: List[List[str]], 
                                          logic) -> int:
@@ -378,16 +417,17 @@ class MoveEvaluator:
     
     def evaluate_moves(self, moves: List[Move], board: List[List[str]], 
                       logic: MatchThreeLogic, use_beam_search: bool = True,
-                      max_time: float = 0.5) -> List[tuple]:
+                      max_time: float = 3.0) -> List[tuple]:
         """
-        Evaluate and rank all moves with beam search optimization
+        Evaluate và rank moves với multi-stage filtering (3 pha)
+        Tối ưu cho độ chính xác cao với thời gian < 3s
         
         Args:
             moves: List of possible moves
             board: Current board state
             logic: MatchThreeLogic instance
-            use_beam_search: Use beam search to optimize evaluation
-            max_time: Maximum time in seconds for evaluation
+            use_beam_search: Use multi-stage filtering
+            max_time: Maximum time in seconds (default 3.0s)
             
         Returns:
             List of (move, score) tuples, sorted by score (descending)
@@ -398,56 +438,158 @@ class MoveEvaluator:
         if not moves:
             return []
         
-        if not use_beam_search or len(moves) <= 20:
-            # Small move count: evaluate all with cascade simulation
+        # Nếu số moves ít, đánh giá trực tiếp với cascade đầy đủ
+        if len(moves) <= 15:
+            if self.rules.get('verbose', False):
+                print(f"📊 Ít moves ({len(moves)}), eval trực tiếp với cascade đầy đủ...")
+            
             scored_moves = []
             for move in moves:
                 if time_module.time() - start_time > max_time:
                     break
-                score = self.score_move(move, board, logic, use_cascade_simulation=True)
+                # Cascade với 7 lần simulation (tối ưu tốc độ)
+                score = self._evaluate_move_with_accurate_cascade(move, board, logic, num_sims=7)
                 scored_moves.append((move, score))
             
             scored_moves.sort(key=lambda x: x[1], reverse=True)
+            elapsed = time_module.time() - start_time
+            if self.rules.get('verbose', False):
+                print(f"✓ Hoàn thành trong {elapsed:.2f}s")
             return scored_moves
         
-        # BEAM SEARCH OPTIMIZATION
-        # Phase 1: Quick evaluation (no cascade simulation)
-        quick_scored = []
+        # ============================================================
+        # MULTI-STAGE FILTERING cho nhiều moves
+        # ============================================================
+        
+        # PHASE 1: Quick Filter - Loại bỏ moves rõ ràng tệ
+        # Chỉ tính immediate score + bonus gems vàng
+        # ============================================================
+        phase1_start = time_module.time()
+        quick_scores = []
+        
         for move in moves:
-            # Quick score without cascade simulation
-            score = self.score_move(move, board, logic, use_cascade_simulation=False)
-            quick_scored.append((move, score))
-        
-        # Sort by quick score
-        quick_scored.sort(key=lambda x: x[1], reverse=True)
-        
-        # Phase 2: Deep evaluation for top candidates
-        beam_width = min(int(len(moves) * 0.3), 30)  # Top 30% or max 30 moves
-        top_candidates = quick_scored[:beam_width]
-        
-        deep_scored = []
-        for move, _ in top_candidates:
-            if time_module.time() - start_time > max_time:
-                # Time limit reached, return what we have
-                remaining = [(m, s) for m, s in quick_scored if m not in [mv for mv, _ in deep_scored]]
-                return deep_scored + remaining
+            score = 0
+            yellow_count = 0
             
-            # Deep score with cascade simulation
-            score = self.score_move(move, board, logic, use_cascade_simulation=True)
-            deep_scored.append((move, score))
+            # Tính điểm immediate
+            for match in move.matches:
+                for pos in match.positions:
+                    gem_type = board[pos.row][pos.col]
+                    score += self.get_gem_points(gem_type)
+                    
+                    if gem_type == "YELLOW_STAR":
+                        yellow_count += 1
+            
+            # Bonus đặc biệt cho gems vàng (ưu tiên cao)
+            score += yellow_count * 20  # Thêm 20 điểm/gem vàng
+            
+            quick_scores.append((move, score))
         
-        # Sort deep scored moves
-        deep_scored.sort(key=lambda x: x[1], reverse=True)
+        quick_scores.sort(key=lambda x: x[1], reverse=True)
         
-        # Add remaining moves with their quick scores
-        # Use list comprehension instead of set (Move is not hashable)
-        deep_scored_moves = [move for move, _ in deep_scored]
-        remaining_moves = [(m, s) for m, s in quick_scored if m not in deep_scored_moves]
+        # Lấy top 50 moves (hoặc 50%)
+        phase1_width = min(max(int(len(moves) * 0.5), 30), 50)
+        phase1_candidates = quick_scores[:phase1_width]
         
-        return deep_scored + remaining_moves
+        phase1_time = time_module.time() - phase1_start
+        if self.rules.get('verbose', False):
+            print(f"✓ Phase 1: {len(moves)} → {len(phase1_candidates)} moves ({phase1_time:.2f}s)")
+        
+        # ============================================================
+        # PHASE 2: Medium Eval - Cascade với 5 lần simulation
+        # ============================================================
+        phase2_start = time_module.time()
+        medium_scores = []
+        
+        for move, _ in phase1_candidates:
+            if time_module.time() - start_time > max_time * 0.7:  # 70% thời gian
+                break
+            
+            # Cascade với 3 lần simulation (tối ưu tốc độ)
+            score = self._evaluate_move_with_accurate_cascade(move, board, logic, num_sims=3)
+            medium_scores.append((move, score))
+        
+        medium_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Lấy top 20 moves
+        phase2_width = min(20, len(medium_scores))
+        phase2_candidates = medium_scores[:phase2_width]
+        
+        phase2_time = time_module.time() - phase2_start
+        if self.rules.get('verbose', False):
+            print(f"✓ Phase 2: {len(phase1_candidates)} → {len(phase2_candidates)} moves ({phase2_time:.2f}s)")
+        
+        # ============================================================
+        # PHASE 3: Deep Eval - Cascade với 10 lần simulation
+        # ============================================================
+        phase3_start = time_module.time()
+        deep_scores = []
+        
+        for move, _ in phase2_candidates:
+            if time_module.time() - start_time > max_time:
+                break
+            
+            # Cascade với 7 lần simulation (chính xác & nhanh)
+            score = self._evaluate_move_with_accurate_cascade(move, board, logic, num_sims=7)
+            deep_scores.append((move, score))
+        
+        deep_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        phase3_time = time_module.time() - phase3_start
+        total_time = time_module.time() - start_time
+        
+        if self.rules.get('verbose', False):
+            print(f"✓ Phase 3: {len(phase2_candidates)} → {len(deep_scores)} moves ({phase3_time:.2f}s)")
+            print(f"🎯 TỔNG THỜI GIAN: {total_time:.2f}s")
+        
+        # Thêm các moves còn lại với điểm từ phase 2 hoặc phase 1
+        # Dùng list comprehension thay vì set vì Move không hashable
+        deep_scored_moves = [m for m, _ in deep_scores]
+        remaining = []
+        
+        # Thêm từ phase 2
+        for m, s in medium_scores:
+            if m not in deep_scored_moves:
+                remaining.append((m, s))
+        
+        # Thêm từ phase 1 (loại bỏ những moves đã có trong deep_scores và medium_scores)
+        all_evaluated_moves = deep_scored_moves + [m for m, _ in remaining]
+        for m, s in quick_scores:
+            if m not in all_evaluated_moves:
+                remaining.append((m, s))
+        
+        return deep_scores + remaining
+    
+    def _evaluate_move_with_accurate_cascade(self, move: Move, board: List[List[str]], 
+                                            logic: MatchThreeLogic, num_sims: int = 5) -> int:
+        """
+        Đánh giá move với cascade simulation chính xác
+        
+        Args:
+            move: Move to evaluate
+            board: Current board state
+            logic: MatchThreeLogic instance
+            num_sims: Số lần simulation
+            
+        Returns:
+            Total score
+        """
+        score = 0
+        
+        # Điểm immediate
+        for match in move.matches:
+            for pos in match.positions:
+                gem_type = board[pos.row][pos.col]
+                score += self.get_gem_points(gem_type)
+        
+        # Điểm cascade (với random spawn)
+        cascade_score = self._simulate_cascade_multiple_runs(move, board, logic, num_sims, max_depth=15)
+        score += cascade_score
+        
+        return score
     
     def get_best_move(self, moves: List[Move], board: List[List[str]], 
-                     logic: MatchThreeLogic, max_time: float = 0.5) -> tuple:
+                     logic: MatchThreeLogic, max_time: float = 3.0) -> tuple:
         """
         Get the best move with time limit
         
@@ -455,7 +597,7 @@ class MoveEvaluator:
             moves: List of possible moves
             board: Current board state
             logic: MatchThreeLogic instance
-            max_time: Maximum time in seconds
+            max_time: Maximum time in seconds (default 3.0s)
             
         Returns:
             Tuple of (best_move, score) or (None, 0) if no moves
@@ -515,11 +657,13 @@ class MoveEvaluator:
                 gem_type = board[pos.row][pos.col]
                 immediate_gems += 1
                 
+                # Tính điểm theo loại gem: YELLOW_STAR=35, GREEN=15, RED=14, BLUE=13, khác=10
+                gem_point = self.get_gem_points(gem_type)
+                immediate_score += gem_point
+                
                 if gem_type == "YELLOW_STAR":
-                    immediate_score += 25
                     yellow_gems += 1
                 else:
-                    immediate_score += 10
                     other_gems += 1
         
         breakdown["immediate_gems"] = immediate_gems
@@ -550,11 +694,13 @@ class MoveEvaluator:
                     gem_count = len(match.positions)
                     cascade_gems += gem_count
                     
+                    # Tính điểm theo loại gem: YELLOW_STAR=35, GREEN=15, RED=14, BLUE=13, khác=10
+                    gem_point = self.get_gem_points(gem_type)
+                    cascade_score += gem_count * gem_point
+                    
                     if gem_type == "YELLOW_STAR":
-                        cascade_score += gem_count * 25
                         cascade_yellow += gem_count
                     else:
-                        cascade_score += gem_count * 10
                         cascade_other += gem_count
             
             breakdown["cascade_depth"] = max(0, cascade_result.get('cascade_depth', 0) - 1)

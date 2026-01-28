@@ -6,6 +6,7 @@ Detects valid moves and matches on the board
 from typing import List, Tuple, Set, Optional
 from dataclasses import dataclass
 from enum import Enum
+import random
 
 
 class Direction(Enum):
@@ -69,6 +70,18 @@ class MatchThreeLogic:
         """
         self.rows = rows
         self.cols = cols
+        
+        # Danh sách các loại gems có thể spawn (dùng cho cascade simulation)
+        self.gem_types = [
+            "BLUE_LIGHTNING",
+            "GREEN_HEART", 
+            "ORANGE_SUN",
+            "PURPLE_MOON",
+            "RED_FIRE",
+            "YELLOW_STAR",
+            "RED_HEART",
+            "GRAY_YINYANG"
+        ]
     
     def is_valid_position(self, pos: Position) -> bool:
         """Check if position is within board bounds"""
@@ -354,8 +367,29 @@ class MatchThreeLogic:
         
         return new_board
     
+    def spawn_random_gems(self, board: List[List[str]]) -> List[List[str]]:
+        """
+        Spawn random gems vào các vị trí EMPTY
+        Được dùng trong cascade simulation để mô phỏng gems rơi từ trên xuống
+        
+        Args:
+            board: Board state có các vị trí EMPTY
+            
+        Returns:
+            Board state với EMPTY được fill bằng random gems
+        """
+        new_board = [row[:] for row in board]
+        
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if new_board[row][col] == "EMPTY":
+                    # Random spawn một gem từ danh sách gem types
+                    new_board[row][col] = random.choice(self.gem_types)
+        
+        return new_board
+    
     def simulate_cascade(self, board: List[List[str]], initial_matches: List[Match], 
-                        max_iterations: int = 5) -> dict:
+                        max_iterations: int = 5, spawn_gems: bool = False) -> dict:
         """
         Simulate cascade effects after a move
         Apply gravity and find new matches repeatedly until stable
@@ -364,6 +398,7 @@ class MatchThreeLogic:
             board: Board state after initial move
             initial_matches: Matches from the initial move
             max_iterations: Maximum cascade iterations to prevent infinite loop
+            spawn_gems: If True, spawn random gems into EMPTY spaces (more accurate)
             
         Returns:
             Dictionary with cascade statistics:
@@ -396,16 +431,19 @@ class MatchThreeLogic:
             # Apply gravity
             current_board = self.simulate_gravity(current_board, removed_positions)
             
-            # Find new matches after gravity
-            # Note: In real game, new gems spawn from top
-            # For simulation, we assume EMPTY spaces won't create new matches
+            # Spawn random gems vào EMPTY (nếu bật)
+            if spawn_gems:
+                current_board = self.spawn_random_gems(current_board)
+            
+            # Find new matches after gravity (and spawn)
             current_matches = self.find_all_matches(current_board)
             
-            # Filter out matches with EMPTY gems (not realistic)
-            current_matches = [
-                match for match in current_matches 
-                if not any(current_board[pos.row][pos.col] == "EMPTY" for pos in match.positions)
-            ]
+            # Nếu không spawn gems, lọc bỏ matches có EMPTY
+            if not spawn_gems:
+                current_matches = [
+                    match for match in current_matches 
+                    if not any(current_board[pos.row][pos.col] == "EMPTY" for pos in match.positions)
+                ]
             
             # If no new matches, cascade ends
             if not current_matches:
